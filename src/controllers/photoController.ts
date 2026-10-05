@@ -16,20 +16,16 @@ export const uploadPhoto = async (
 
     const { title = "Family Memory" } = req.body;
 
-    // Get the last photo order
     const lastPhoto = await Photo.findOne().sort({
       order: -1,
     });
 
-    // Automatically assign next order number
     const nextOrder = lastPhoto ? lastPhoto.order + 1 : 1;
 
-    // Convert uploaded buffer to Data URI
     const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString(
       "base64"
     )}`;
 
-    // Upload to Cloudinary
     const uploadResult = await cloudinary.uploader.unsigned_upload(
       dataUri,
       "family-album",
@@ -38,7 +34,6 @@ export const uploadPhoto = async (
       }
     );
 
-    // Save photo information in MongoDB
     const photo = await Photo.create({
       imageUrl: uploadResult.secure_url,
       publicId: uploadResult.public_id,
