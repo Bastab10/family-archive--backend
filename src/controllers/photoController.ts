@@ -2,72 +2,126 @@ import { Request, Response } from "express";
 import Photo from "../models/Photo";
 import cloudinary from "../config/cloudinary";
 
-export const uploadPhoto = async (
+const validCategories = [
+  "wedding",
+  "childhood",
+  "grandparents",
+  "family",
+] as const;
+
+type Category = (typeof validCategories)[number];
+
+export const uploadPhotos = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
-    if (!req.file) {
+    const files = req.files as Express.Multer.File[];
+
+    if (!files || files.length === 0) {
       res.status(400).json({
-        message: "No photo uploaded",
+        message: "Please select at least 1 photo.",
       });
       return;
     }
 
-    const { title = "Family Memory" } = req.body;
+    if (files.length > 5) {
+      res.status(400).json({
+        message: "You can upload a maximum of 5 photos.",
+      });
+      return;
+    }
+
+    const {
+      title = "Family Memory",
+      category = "family",
+    } = req.body;
+
+    if (
+      typeof category !== "string" ||
+      !validCategories.includes(category as Category)
+    ) {
+      res.status(400).json({
+        message: "Invalid category",
+      });
+      return;
+    }
 
     const lastPhoto = await Photo.findOne().sort({
       order: -1,
     });
 
-    const nextOrder = lastPhoto ? lastPhoto.order + 1 : 1;
+    let nextOrder = lastPhoto
+      ? lastPhoto.order + 1
+      : 1;
 
-    const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString(
-      "base64"
-    )}`;
+    const uploadedPhotos = [];
 
-    const uploadResult = await cloudinary.uploader.unsigned_upload(
-      dataUri,
-      "family-album",
-      {
-        resource_type: "image",
-      }
-    );
+    for (const file of files) {
+      const dataUri = `data:${file.mimetype};base64,${file.buffer.toString(
+        "base64"
+      )}`;
 
-    const photo = await Photo.create({
-      imageUrl: uploadResult.secure_url,
-      publicId: uploadResult.public_id,
-      title,
-      order: nextOrder,
-    });
+      const uploadResult =
+        await cloudinary.uploader.unsigned_upload(
+          dataUri,
+          "family-album",
+          {
+            resource_type: "image",
+          }
+        );
+
+      const photo = await Photo.create({
+        imageUrl: uploadResult.secure_url,
+        publicId: uploadResult.public_id,
+        title,
+        category: category as Category,
+        order: nextOrder,
+      });
+
+      uploadedPhotos.push(photo);
+      nextOrder++;
+    }
 
     res.status(201).json({
-      message: "Photo uploaded successfully",
-      photo,
+      message: `${uploadedPhotos.length} photo${
+        uploadedPhotos.length > 1 ? "s" : ""
+      } uploaded successfully`,
+      photos: uploadedPhotos,
     });
-  } catch (error: any) {
-    console.error("========== CLOUDINARY UPLOAD ERROR ==========");
-    console.error("Message:", error?.message);
-    console.error("HTTP Code:", error?.http_code);
-    console.error("Name:", error?.name);
-    console.error("Full Error:", JSON.stringify(error, null, 2));
-    console.error("HTTP Headers:", error?.headers);
-    console.error("Response:", error?.response);
-    console.error("==============================================");
+  } catch (error) {
+    console.error("Upload photos error:", error);
 
     res.status(500).json({
-      message: "Failed to upload photo",
-      error: error?.message,
+      message: "Failed to upload photos",
     });
   }
 };
 
 export const getPhotos = async (
-  _req: Request,
+  req: Request,
   res: Response
 ): Promise<void> => {
   try {
-    const photos = await Photo.find().sort({
+    const category = req.query.category;
+
+    if (
+      category !== undefined &&
+      (typeof category !== "string" ||
+        !validCategories.includes(category as Category))
+    ) {
+      res.status(400).json({
+        message: "Invalid category",
+      });
+      return;
+    }
+
+    const filter =
+      typeof category === "string"
+        ? { category: category as Category }
+        : {};
+
+    const photos = await Photo.find(filter).sort({
       order: 1,
       createdAt: 1,
     });

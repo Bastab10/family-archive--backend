@@ -4,6 +4,7 @@ export interface IPhoto extends Document {
   imageUrl: string;
   publicId: string;
   title: string;
+  category: "wedding" | "childhood" | "grandparents" | "family";
   order: number;
   createdAt: Date;
 }
@@ -24,6 +25,18 @@ const photoSchema = new Schema<IPhoto>(
       type: String,
       required: true,
       default: "Family Memory",
+    },
+
+    category: {
+      type: String,
+      enum: [
+        "wedding",
+        "childhood",
+        "grandparents",
+        "family",
+      ],
+      required: true,
+      default: "family",
     },
 
     order: {

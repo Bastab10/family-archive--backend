@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 
 import {
-  uploadPhoto,
+  uploadPhotos,
   getPhotos,
   deletePhoto,
 } from "../controllers/photoController";
@@ -13,10 +13,15 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024,
+    files: 5,
   },
 });
 
-router.post("/upload", upload.single("photo"), uploadPhoto);
+router.post(
+  "/upload",
+  upload.array("photos", 5),
+  uploadPhotos
+);
 
 router.get("/", getPhotos);
 
